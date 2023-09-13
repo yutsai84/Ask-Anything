@@ -12,6 +12,17 @@ from load_internvideo import *
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 from simplet5 import SimpleT5
 from models.grit_model import DenseCaptioning
+
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_KEY"] = os.environ[
+    "AZURE_OPENAI_NONREDUNDANT_ACCESS_KEY_DEVELOPMENT"
+]
+os.environ["OPENAI_API_BASE"] = os.environ[
+    "AZURE_OPENAI_NONREDUNDANT_ENDPOINT_DEVELOPMENT"
+]
+os.environ["OPENAI_API_VERSION"] = "2023-03-15-preview"
+
+
 bot = ConversationBot()
 image_size = 384
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -120,17 +131,10 @@ with gr.Blocks(css="#chatbot {overflow:auto; height:500px;}") as demo:
             with gr.Row():
                 with gr.Column(sclae=0.3, min_width=0):
                     caption = gr.Button("✍ Upload")
-                    chat_video = gr.Button(" 🎥 Let's Chat! ", interactive=False)
+                    chat_video = gr.Button(" 🎥 Let's Chat! ", interactive=True)
                 with gr.Column(scale=0.7, min_width=0):
                     loadinglabel = gr.Label(label="State")
         with gr.Column():
-            openai_api_key_textbox = gr.Textbox(
-                value=os.environ["OPENAI_API_KEY"],
-                placeholder="Paste your OpenAI API key here to start (sk-...)",
-                show_label=False,
-                lines=1,
-                type="password",
-            )
             chatbot = gr.Chatbot(elem_id="chatbot", label="gpt")
             state = gr.State([])
             user_tag_output = gr.State("")
@@ -156,7 +160,7 @@ with gr.Blocks(css="#chatbot {overflow:auto; height:500px;}") as demo:
     caption.click(lambda: [], None, state)    
     caption.click(inference,[input_video_path,input_tag],[model_tag_output, user_tag_output, image_caption_output, dense_caption_output,video_caption_output, chat_video, loadinglabel])
 
-    chat_video.click(bot.init_agent, [openai_api_key_textbox, image_caption_output, dense_caption_output, video_caption_output, model_tag_output, state], [input_raws,chatbot, state, openai_api_key_textbox])
+    chat_video.click(bot.init_agent, [image_caption_output, dense_caption_output, video_caption_output, model_tag_output, state], [input_raws,chatbot, state,])
 
     txt.submit(bot.run_text, [txt, state], [chatbot, state])
     txt.submit(lambda: "", None, txt)
@@ -166,7 +170,7 @@ with gr.Blocks(css="#chatbot {overflow:auto; height:500px;}") as demo:
     clear.click(bot.memory.clear)
     clear.click(lambda: [], None, chatbot)
     clear.click(lambda: [], None, state)
-    
+
 
 
 demo.launch(server_name="0.0.0.0",enable_queue=True,)#share=True)

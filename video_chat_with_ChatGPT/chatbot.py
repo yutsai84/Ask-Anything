@@ -1,26 +1,34 @@
+import os
+
 from langchain.agents.initialize import initialize_agent
 from langchain.agents.tools import Tool
 from langchain.chains.conversation.memory import ConversationBufferMemory
 from langchain.llms.openai import OpenAI
+from langchain.llms import AzureOpenAI
+from langchain.chat_models import AzureChatOpenAI
 import re
 import gradio as gr
 import openai
 
+os.environ["OPENAI_API_TYPE"] = "azure"
+os.environ["OPENAI_API_KEY"] = os.environ[
+    "AZURE_OPENAI_NONREDUNDANT_ACCESS_KEY_DEVELOPMENT"
+]
 
-def cut_dialogue_history(history_memory, keep_last_n_words=400):
-    if history_memory is None or len(history_memory) == 0:
-        return history_memory
-    tokens = history_memory.split()
-    n_tokens = len(tokens)
-    print(f"history_memory:{history_memory}, n_tokens: {n_tokens}")
-    if n_tokens < keep_last_n_words:
-        return history_memory
-    paragraphs = history_memory.split('\n')
-    last_n_tokens = n_tokens
-    while last_n_tokens >= keep_last_n_words:
-        last_n_tokens -= len(paragraphs[0].split(' '))
-        paragraphs = paragraphs[1:]
-    return '\n' + '\n'.join(paragraphs)
+os.environ["OPENAI_API_BASE"] = os.environ[
+    "AZURE_OPENAI_NONREDUNDANT_ENDPOINT_DEVELOPMENT"
+]
+os.environ["OPENAI_API_VERSION"] = "2023-03-15-preview"
+
+
+GPT4 = AzureChatOpenAI(
+    deployment_name="gpt-4-32k",
+    model_name="gpt4-32k",
+    openai_api_base=os.environ["OPENAI_API_BASE"],
+    openai_api_version="2023-03-15-preview",
+    temperature=0,
+    model_kwargs={"top_p": 0.01},
+)
 
 
 class ConversationBot:
@@ -29,7 +37,6 @@ class ConversationBot:
         self.tools = []
 
     def run_text(self, text, state):
-        self.agent.memory.buffer = cut_dialogue_history(self.agent.memory.buffer, keep_last_n_words=500)
         res = self.agent({"input": text.strip()})
         res['output'] = res['output'].replace("\\", "/")
         response = res['output'] 
@@ -39,7 +46,7 @@ class ConversationBot:
         return state, state
 
 
-    def init_agent(self, openai_api_key, image_caption, dense_caption, video_caption, tags, state):
+    def init_agent(self, image_caption, dense_caption, video_caption, tags, state):
         chat_history =''
         PREFIX = "ChatVideo is a chatbot that chats with you based on video descriptions."
         FORMAT_INSTRUCTIONS = """
@@ -65,10 +72,7 @@ class ConversationBot:
                 {agent_scratchpad}
                 """
         self.memory.clear()
-        if not openai_api_key.startswith('sk-'):
-            return gr.update(visible = False),state, state, "Please paste your key here !"
-        self.llm = OpenAI(temperature=0, openai_api_key=openai_api_key,model_name="gpt-4")
-        # openai.api_base = 'https://api.openai-proxy.com/v1/'  
+        self.llm = GPT4
         self.agent = initialize_agent(
             self.tools,
             self.llm,
@@ -78,8 +82,7 @@ class ConversationBot:
             return_intermediate_steps=True,
             agent_kwargs={'prefix': PREFIX, 'format_instructions': FORMAT_INSTRUCTIONS, 'suffix': SUFFIX}, )
         state = state + [("I upload a video, Please watch it first! ","I have watch this video, Let's chat!")]
-        return gr.update(visible = True),state, state, openai_api_key
-
+        return gr.update(visible = True),state, state,
 if __name__=="__main__":
     import pdb
     pdb.set_trace()

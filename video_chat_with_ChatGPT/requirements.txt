@@ -23,7 +23,7 @@ nltk
 webdataset
 accelerate
 bitsandbytes
-langchain==0.0.101
+langchain==0.0.287
 timm==0.4.12
 transformers
 fairscale==0.4.4
